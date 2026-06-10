@@ -1,0 +1,11 @@
+account_id,account_type,customer_id,customer_name,customer_email,customer_phone,customer_segment,customer_timezone,risk_rating,credit_limit,effective_date,is_active
+ACC001,SAVINGS,CUST001,Rahul Sharma,rahul.sharma@gmail.com,9876543201,RETAIL,Asia/Kolkata,LOW,100000,2023-01-01,Y
+ACC002,CURRENT,CUST002,Priya Patel,priya.patel@gmail.com,9876543202,HNI,Asia/Kolkata,LOW,2000000,2023-01-15,Y
+ACC003,SAVINGS,CUST003,Amit Verma,amit.verma@gmail.com,9876543203,RETAIL,Asia/Kolkata,MEDIUM,150000,2023-02-01,Y
+ACC004,SAVINGS,CUST004,Sneha Joshi,sneha.joshi@gmail.com,9876543204,RETAIL,Asia/Kolkata,LOW,75000,2023-02-15,Y
+ACC005,SAVINGS,CUST005,Vikram Singh,vikram.singh@gmail.com,9876543205,RETAIL,Asia/Kolkata,LOW,50000,2023-03-01,Y
+ACC006,CURRENT,CUST006,Deepika Nair,deepika.nair@gmail.com,9876543206,CORPORATE,Asia/Kolkata,LOW,500000,2023-03-15,Y
+ACC007,SAVINGS,CUST007,Ananya Krishnan,ananya.k@gmail.com,9876543207,RETAIL,Asia/Kolkata,LOW,80000,2023-04-01,Y
+ACC008,SAVINGS,CUST008,Rohan Mehta,rohan.mehta@gmail.com,9876543208,RETAIL,Asia/Kolkata,MEDIUM,120000,2023-04-15,Y
+ACC009,CURRENT,CUST009,Arjun Kapoor,arjun.kapoor@gmail.com,9876543209,HNI,Asia/Kolkata,LOW,3000000,2023-05-01,Y
+ACC010,SAVINGS,CUST010,Kavya Reddy,kavya.reddy@gmail.com,9876543210,RETAIL,Asia/Kolkata,LOW,90000,2023-05-15,Y

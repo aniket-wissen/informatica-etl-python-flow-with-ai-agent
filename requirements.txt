@@ -1,0 +1,15 @@
+pandas
+sqlalchemy
+psycopg2-binary
+pyodbc
+pydantic
+pydantic-settings
+python-dotenv
+pytz
+pycountry
+email-validator
+loguru
+langgraph
+langchain-core
+langchain-groq
+fastmcp

@@ -1,0 +1,8 @@
+venv/
+.env
+__pycache__/
+*.pyc
+*.db
+data/schema_cache/schemas.json
+logs/
+.pytest_cache/
