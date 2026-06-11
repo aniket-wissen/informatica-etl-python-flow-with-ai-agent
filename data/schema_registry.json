@@ -8,6 +8,7 @@
         "account_id"
       ],
       "enrichment_key": "account_id",
+      "enrichment_source": "accounts",
       "canonical_headers": [
         "transaction_id",
         "date",
@@ -24,6 +25,41 @@
         "status",
         "notes"
       ],
+      "cleansing_rules": {
+        "transaction_id": {
+          "type": "mandatory",
+          "unique": true
+        },
+        "amount": {
+          "type": "positive_number"
+        },
+        "currency": {
+          "type": "enum",
+          "values": [
+            "INR",
+            "USD",
+            "EUR",
+            "GBP",
+            "AED",
+            "SGD",
+            "JPY"
+          ]
+        },
+        "account_id": {
+          "type": "mandatory"
+        },
+        "status": {
+          "type": "enum",
+          "values": [
+            "SUCCESS",
+            "FAILED",
+            "PENDING"
+          ]
+        },
+        "date": {
+          "type": "date"
+        }
+      },
       "field_descriptions": {
         "transaction_id": "Unique transaction identifier",
         "amount": "Transaction amount",
@@ -39,6 +75,7 @@
         "customer_id"
       ],
       "enrichment_key": null,
+      "enrichment_source": null,
       "canonical_headers": [
         "account_id",
         "account_type",
@@ -53,6 +90,18 @@
         "effective_date",
         "is_active"
       ],
+      "cleansing_rules": {
+        "account_id": {
+          "type": "mandatory",
+          "unique": true
+        },
+        "customer_id": {
+          "type": "mandatory"
+        },
+        "customer_email": {
+          "type": "email"
+        }
+      },
       "field_descriptions": {
         "account_id": "Unique account identifier",
         "customer_id": "Customer reference"
@@ -61,14 +110,15 @@
       "registered_on": "2024-03-01",
       "registered_by": "system"
     },
-    "e-commerce_order": {
+    "e_commerce_order": {
       "mandatory_fields": [
         "order_id",
         "order_date",
         "customer_id",
         "product_name"
       ],
-      "enrichment_key": "order_id",
+      "enrichment_key": "customer_id",
+      "enrichment_source": "accounts",
       "canonical_headers": [
         "order_id",
         "order_date",
@@ -81,6 +131,43 @@
         "delivery_city",
         "delivery_country"
       ],
+      "cleansing_rules": {
+        "order_id": {
+          "type": "unique",
+          "unique": true
+        },
+        "order_date": {
+          "type": "date"
+        },
+        "customer_id": {
+          "type": "mandatory"
+        },
+        "product_name": {
+          "type": "mandatory"
+        },
+        "quantity": {
+          "type": "positive_number"
+        },
+        "unit_price": {
+          "type": "positive_number"
+        },
+        "total_amount": {
+          "type": "positive_number"
+        },
+        "order_status": {
+          "type": "enum",
+          "values": [
+            "DELIVERED",
+            "SHIPPED"
+          ]
+        },
+        "delivery_city": {
+          "type": "mandatory"
+        },
+        "delivery_country": {
+          "type": "mandatory"
+        }
+      },
       "field_descriptions": {
         "order_id": "Unique identifier for the order",
         "order_date": "Date the order was placed",

@@ -60,15 +60,114 @@ def enrichment_agent(state: ETLState) -> ETLState:
     clean_df = state["clean_df"].copy()
     entity_type = state["entity_type"]
 
-    # Only transactions need enrichment
     if entity_type != "transactions":
-        # Non-transaction entities — no enrichment needed
-        # Just add audit metadata and pass through
-        logger.info(f"  Entity '{entity_type}' — no enrichment rules, passing through")
-        clean_df["ai_inferred"]   = "N"
-        clean_df["ai_confidence"] = None
-        state["enriched_df"]      = clean_df
-        state["enriched_count"]   = len(clean_df)
+        # Check registry for dynamic enrichment config
+        from src.utils.schema_registry import get_entity
+        schema = get_entity(entity_type)
+        enrichment_key    = schema.get("enrichment_key")    if schema else None
+        enrichment_source = schema.get("enrichment_source") if schema else None
+
+        if not enrichment_key or not enrichment_source:
+            # No enrichment configured — pass through
+            logger.info(f"  Entity '{entity_type}' — no enrichment configured, passing through")
+            clean_df["ai_inferred"]   = "N"
+            clean_df["ai_confidence"] = None
+            state["enriched_df"]      = clean_df
+            state["enriched_count"]   = len(clean_df)
+            return state
+
+        # Dynamic enrichment — look up enrichment_source table
+        logger.info(f"  Dynamic enrichment: {enrichment_key} → {enrichment_source} table")
+        from src.db.engine import SessionLocal
+        from sqlalchemy import text
+
+        session = SessionLocal()
+        try:
+            rows = session.execute(text(f'SELECT * FROM "{enrichment_source}"')).mappings().all()
+            lookup = {str(r[enrichment_key]): dict(r) for r in rows if r.get(enrichment_key)}
+            logger.info(f"  Loaded {len(lookup)} records from '{enrichment_source}' for lookup")
+        except Exception as e:
+            logger.warning(f"  Could not load '{enrichment_source}': {e} — skipping enrichment")
+            lookup = {}
+        finally:
+            session.close()
+
+        enriched_rows     = []
+        unmatched         = []
+        ai_inferred_count = 0
+
+        for _, row in clean_df.iterrows():
+            key_val = str(row.get(enrichment_key, "")).strip()
+            match   = lookup.get(key_val)
+
+            if match:
+                row = row.copy()
+                for col, val in match.items():
+                    if col not in row.index:
+                        row[col] = val
+                row["ai_inferred"]   = "N"
+                row["ai_confidence"] = None
+                enriched_rows.append(row)
+            else:
+                unmatched.append(row.to_dict())
+
+        logger.info(f"  DB matched: {len(enriched_rows)} rows")
+        logger.info(f"  Unmatched (going to AI): {len(unmatched)} rows")
+
+        # AI batch fallback for unmatched
+        if unmatched:
+            try:
+                # Build a simple prompt for dynamic entity enrichment
+                from langchain_groq import ChatGroq
+                from langchain_core.messages import HumanMessage
+                llm = ChatGroq(
+                    api_key=settings.GROQ_API_KEY,
+                    model="llama-3.3-70b-versatile",
+                    temperature=0
+                )
+                prompt = f"""You are an ETL enrichment agent.
+These {entity_type} rows have unknown {enrichment_key} values.
+Based on available context, infer missing metadata.
+
+Rows: {unmatched}
+Enrichment source table: {enrichment_source}
+Enrichment key: {enrichment_key}
+
+Return ONLY a JSON array — one object per row with {enrichment_key} and inferred fields:
+[{{"{ enrichment_key}": "val", "inferred_field": "value", "ai_confidence": "high|medium|low"}}]"""
+
+                response  = llm.invoke([HumanMessage(content=prompt)])
+                text_resp = response.content.strip().replace("```json","").replace("```","")
+                ai_results = {
+                    str(r[enrichment_key]): r
+                    for r in json.loads(text_resp)
+                    if enrichment_key in r
+                }
+
+                for row_dict in unmatched:
+                    key_val  = str(row_dict.get(enrichment_key, "")).strip()
+                    ai_match = ai_results.get(key_val, {})
+                    row      = pd.Series(row_dict)
+                    for col, val in ai_match.items():
+                        if col not in row.index:
+                            row[col] = val
+                    row["ai_inferred"]   = "Y"
+                    row["ai_confidence"] = ai_match.get("ai_confidence", "low")
+                    enriched_rows.append(row)
+                    ai_inferred_count += 1
+
+            except Exception as e:
+                logger.error(f"  Dynamic AI enrichment failed: {e}")
+                for row_dict in unmatched:
+                    row = pd.Series(row_dict)
+                    row["ai_inferred"]   = "Y"
+                    row["ai_confidence"] = "failed"
+                    enriched_rows.append(row)
+
+        state["enriched_df"]       = pd.DataFrame(enriched_rows)
+        state["enriched_count"]    = len(enriched_rows)
+        state["ai_inferred_count"] = ai_inferred_count
+        logger.success(f"✅ EnrichmentAgent done — {len(enriched_rows)} rows, {ai_inferred_count} AI inferred")
         return state
 
     # Step 1 — load accounts lookup from DB

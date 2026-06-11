@@ -155,6 +155,82 @@ def _cleanse_generic(df: pd.DataFrame, source_file: str, entity_type: str) -> tu
     clean_df = pd.DataFrame(clean_rows) if clean_rows else pd.DataFrame(columns=df.columns)
     return clean_df, failed_rows
 
+def _cleanse_dynamic(df: pd.DataFrame, entity_type: str, source_file: str) -> tuple[pd.DataFrame, list[dict]]:
+    """Dynamic cleansing using rules from schema registry."""
+    from src.utils.schema_registry import get_entity
+    import pycountry
+    from email_validator import validate_email, EmailNotValidError
+
+    schema = get_entity(entity_type)
+    if not schema:
+        logger.warning(f"  No schema found for '{entity_type}' — skipping cleansing")
+        return df, []
+
+    rules      = schema.get("cleansing_rules", {})
+    clean_rows = []
+    failed_rows = []
+    seen_ids   = {}
+
+    logger.info(f"  Applying {len(rules)} dynamic rules for '{entity_type}'")
+
+    for _, row in df.iterrows():
+        errors = []
+
+        for field, rule in rules.items():
+            val     = row.get(field)
+            val_str = str(val).strip() if val is not None else ""
+            rule_type = rule.get("type", "")
+
+            # mandatory
+            if rule_type == "mandatory" or rule.get("unique"):
+                if not val_str or val_str.lower() in ("nan", "none", ""):
+                    errors.append((field, f"Missing {field}"))
+                    continue
+
+            # unique
+            if rule.get("unique"):
+                if val_str in seen_ids.get(field, set()):
+                    errors.append((field, f"Duplicate {field}: {val_str}"))
+                    continue
+                seen_ids.setdefault(field, set()).add(val_str)
+
+            # positive_number
+            if rule_type == "positive_number":
+                try:
+                    if float(val_str) <= 0:
+                        errors.append((field, f"{field} must be positive"))
+                except (ValueError, TypeError):
+                    errors.append((field, f"Invalid number for {field}: {val_str}"))
+
+            # date
+            if rule_type == "date":
+                try:
+                    pd.to_datetime(val_str)
+                except Exception:
+                    errors.append((field, f"Invalid date for {field}: {val_str}"))
+
+            # email
+            if rule_type == "email" and val_str:
+                try:
+                    validate_email(val_str, check_deliverability=False)
+                except EmailNotValidError:
+                    errors.append((field, f"Invalid email: {val_str}"))
+
+            # enum
+            if rule_type == "enum":
+                allowed = [v.upper() for v in rule.get("values", [])]
+                if allowed and val_str.upper() not in allowed:
+                    errors.append((field, f"Invalid {field}: {val_str}. Allowed: {allowed}"))
+
+        if errors:
+            for field, reason in errors:
+                failed_rows.append(_flag_failed(row, reason, field, source_file, entity_type))
+        else:
+            clean_rows.append(row)
+
+    clean_df = pd.DataFrame(clean_rows) if clean_rows else pd.DataFrame(columns=df.columns)
+    return clean_df, failed_rows
+
 def cleansing_agent(state: ETLState) -> ETLState:
     logger.info("🤖 CleansingAgent started")
 
@@ -167,9 +243,8 @@ def cleansing_agent(state: ETLState) -> ETLState:
     elif entity_type == "accounts":
         clean_df, failed_rows = _cleanse_accounts(df, source_file)
     else:
-        # Generic cleansing for unknown entity types
-        logger.info(f"  No specific rules for '{entity_type}' — applying generic cleansing")
-        clean_df, failed_rows = _cleanse_generic(df, source_file, entity_type)
+        logger.info(f"  Using dynamic cleansing for '{entity_type}'")
+        clean_df, failed_rows = _cleanse_dynamic(df, entity_type, source_file)
 
     failed_df = pd.DataFrame(failed_rows) if failed_rows else pd.DataFrame()
 

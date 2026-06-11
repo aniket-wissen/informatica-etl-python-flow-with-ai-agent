@@ -206,17 +206,39 @@ def _handle_unknown_entity(state: ETLState) -> ETLState:
     if choice == "Rename entity type before registering":
         entity_type = input("  Enter entity type name: ").strip().lower()
 
-    # Register in schema registry
+    # Generate cleansing rules + enrichment config via AI
+    from prompts.cleansing_rules import build_cleansing_rules_prompt
+    from src.utils.schema_registry import load_registry
+    known_tables = list(load_registry()["entities"].keys())
+
+    logger.info("  🤖 Generating cleansing rules for new entity...")
+    rules_result = _call_ai(build_cleansing_rules_prompt(
+        entity_type, headers,
+        samples[:3],
+        known_tables
+    ))
+
+    cleansing_rules   = rules_result.get("cleansing_rules", {})
+    enrichment_key    = rules_result.get("enrichment_key") or enrichment_key
+    enrichment_source = rules_result.get("enrichment_source")
+
+    logger.info(f"  Generated {len(cleansing_rules)} cleansing rules")
+    if enrichment_source:
+        logger.info(f"  Enrichment: {enrichment_key} → {enrichment_source} table")
+
+    entity_type = entity_type.replace("-", "_").replace(" ", "_").lower()
     register_entity(
         entity_type=entity_type,
         mandatory_fields=mandatory,
         enrichment_key=enrichment_key,
+        enrichment_source=enrichment_source,
         canonical_headers=headers,
         field_descriptions=descriptions,
+        cleansing_rules=cleansing_rules,
         registered_by="human"
     )
     save_schema(headers, entity_type, mandatory, enrichment_key)
-    logger.success(f"✅ Entity '{entity_type}' registered")
+    logger.success(f"✅ Entity '{entity_type}' registered with {len(cleansing_rules)} cleansing rules")
 
     state["entity_type"]   = entity_type
     state["schema_cached"] = True

@@ -24,12 +24,16 @@ def get_entity(entity_type: str) -> dict | None:
 
 def register_entity(entity_type: str, mandatory_fields: list,
                     enrichment_key: str | None, canonical_headers: list,
-                    field_descriptions: dict, registered_by: str = "human"):
+                    field_descriptions: dict, cleansing_rules: dict = None,
+                    enrichment_source: str | None = None,
+                    registered_by: str = "human"):
     registry = load_registry()
     registry["entities"][entity_type] = {
         "mandatory_fields":   mandatory_fields,
         "enrichment_key":     enrichment_key,
+        "enrichment_source":  enrichment_source,
         "canonical_headers":  canonical_headers,
+        "cleansing_rules":    cleansing_rules or {},
         "field_descriptions": field_descriptions,
         "version":            1,
         "registered_on":      str(date.today()),
