@@ -1,0 +1,4 @@
+transaction_id,date,time,amount,currency,account_id,merchant_name,merchant_city,merchant_country,channel,payment_method,transaction_type,status,notes,merchant_category,loyalty_points
+TXN201,2024-04-01,10:00:00,3500.00,INR,ACC001,Zomato,Mumbai,IN,UPI,UPI,DEBIT,SUCCESS,Dinner,FOOD,35
+TXN202,2024-04-01,11:30:00,12000.00,USD,ACC002,Amazon,Delhi,IN,APP,CARD,DEBIT,SUCCESS,Laptop,ELECTRONICS,120
+TXN203,2024-04-02,14:00:00,800.00,INR,ACC003,Swiggy,Pune,IN,UPI,UPI,DEBIT,SUCCESS,Lunch,FOOD,8

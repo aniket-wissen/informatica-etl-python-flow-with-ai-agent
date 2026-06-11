@@ -62,9 +62,13 @@ def enrichment_agent(state: ETLState) -> ETLState:
 
     # Only transactions need enrichment
     if entity_type != "transactions":
-        logger.info("  Accounts entity — no enrichment needed")
-        state["enriched_df"] = clean_df
-        state["enriched_count"] = len(clean_df)
+        # Non-transaction entities — no enrichment needed
+        # Just add audit metadata and pass through
+        logger.info(f"  Entity '{entity_type}' — no enrichment rules, passing through")
+        clean_df["ai_inferred"]   = "N"
+        clean_df["ai_confidence"] = None
+        state["enriched_df"]      = clean_df
+        state["enriched_count"]   = len(clean_df)
         return state
 
     # Step 1 — load accounts lookup from DB

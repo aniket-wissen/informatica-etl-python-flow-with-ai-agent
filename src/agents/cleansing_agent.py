@@ -113,6 +113,47 @@ def _cleanse_accounts(df: pd.DataFrame, source_file: str) -> tuple[pd.DataFrame,
     clean_df = pd.DataFrame(clean_rows) if clean_rows else pd.DataFrame(columns=df.columns)
     return clean_df, failed_rows
 
+def _cleanse_generic(df: pd.DataFrame, source_file: str, entity_type: str) -> tuple[pd.DataFrame, list[dict]]:
+    """
+    Generic cleansing for unknown entity types.
+    Applies basic rules — no nulls in first column, no fully empty rows.
+    """
+    clean_rows  = []
+    failed_rows = []
+
+    # First column is assumed to be the primary key
+    pk_column = df.columns[0] if len(df.columns) > 0 else None
+
+    for _, row in df.iterrows():
+        errors = []
+
+        # Check primary key not null
+        if pk_column:
+            pk_val = str(row.get(pk_column, "")).strip()
+            if not pk_val or pk_val.lower() == "nan":
+                errors.append((pk_column, f"Missing primary key: {pk_column}"))
+
+        # Check row is not completely empty
+        non_null = sum(1 for v in row if str(v).strip() and str(v).strip().lower() != "nan")
+        if non_null == 0:
+            errors.append(("row", "Completely empty row"))
+
+        if errors:
+            for field, reason in errors:
+                failed_rows.append({
+                    "source_file":    source_file,
+                    "entity_type":    entity_type,
+                    "row_identifier": str(row.get(pk_column, "UNKNOWN")),
+                    "error_type":     "VALIDATION_FAILED",
+                    "error_field":    field,
+                    "error_reason":   reason,
+                    "raw_record":     str(row.to_dict())
+                })
+        else:
+            clean_rows.append(row)
+
+    clean_df = pd.DataFrame(clean_rows) if clean_rows else pd.DataFrame(columns=df.columns)
+    return clean_df, failed_rows
 
 def cleansing_agent(state: ETLState) -> ETLState:
     logger.info("🤖 CleansingAgent started")
@@ -126,9 +167,9 @@ def cleansing_agent(state: ETLState) -> ETLState:
     elif entity_type == "accounts":
         clean_df, failed_rows = _cleanse_accounts(df, source_file)
     else:
-        state["error"] = f"Unknown entity type: {entity_type}"
-        logger.error(state["error"])
-        return state
+        # Generic cleansing for unknown entity types
+        logger.info(f"  No specific rules for '{entity_type}' — applying generic cleansing")
+        clean_df, failed_rows = _cleanse_generic(df, source_file, entity_type)
 
     failed_df = pd.DataFrame(failed_rows) if failed_rows else pd.DataFrame()
 

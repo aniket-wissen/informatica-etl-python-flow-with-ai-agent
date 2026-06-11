@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "entities": {
+    "transactions": {
+      "mandatory_fields": [
+        "transaction_id",
+        "amount",
+        "account_id"
+      ],
+      "enrichment_key": "account_id",
+      "canonical_headers": [
+        "transaction_id",
+        "date",
+        "time",
+        "amount",
+        "currency",
+        "account_id",
+        "merchant_name",
+        "merchant_city",
+        "merchant_country",
+        "channel",
+        "payment_method",
+        "transaction_type",
+        "status",
+        "notes"
+      ],
+      "field_descriptions": {
+        "transaction_id": "Unique transaction identifier",
+        "amount": "Transaction amount",
+        "account_id": "Account reference"
+      },
+      "version": 1,
+      "registered_on": "2024-03-01",
+      "registered_by": "system"
+    },
+    "accounts": {
+      "mandatory_fields": [
+        "account_id",
+        "customer_id"
+      ],
+      "enrichment_key": null,
+      "canonical_headers": [
+        "account_id",
+        "account_type",
+        "customer_id",
+        "customer_name",
+        "customer_email",
+        "customer_phone",
+        "customer_segment",
+        "customer_timezone",
+        "risk_rating",
+        "credit_limit",
+        "effective_date",
+        "is_active"
+      ],
+      "field_descriptions": {
+        "account_id": "Unique account identifier",
+        "customer_id": "Customer reference"
+      },
+      "version": 1,
+      "registered_on": "2024-03-01",
+      "registered_by": "system"
+    },
+    "e-commerce_order": {
+      "mandatory_fields": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_name"
+      ],
+      "enrichment_key": "order_id",
+      "canonical_headers": [
+        "order_id",
+        "order_date",
+        "customer_id",
+        "product_name",
+        "quantity",
+        "unit_price",
+        "total_amount",
+        "order_status",
+        "delivery_city",
+        "delivery_country"
+      ],
+      "field_descriptions": {
+        "order_id": "Unique identifier for the order",
+        "order_date": "Date the order was placed",
+        "customer_id": "Unique identifier for the customer",
+        "product_name": "Name of the product ordered",
+        "quantity": "Number of units of the product ordered",
+        "unit_price": "Price of a single unit of the product",
+        "total_amount": "Total cost of the order",
+        "order_status": "Current status of the order (e.g. shipped, delivered)",
+        "delivery_city": "City where the order will be delivered",
+        "delivery_country": "Country where the order will be delivered"
+      },
+      "version": 1,
+      "registered_on": "2026-06-11",
+      "registered_by": "human"
+    }
+  }
+}

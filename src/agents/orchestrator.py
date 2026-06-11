@@ -40,9 +40,11 @@ def should_continue_after_cleansing(state: ETLState) -> str:
 
 
 def should_continue_after_enrichment(state: ETLState) -> str:
-    """Stop pipeline if enrichment failed."""
     if state.get("error"):
         logger.error(f"Pipeline stopping after enrichment: {state['error']}")
+        return "end"
+    if state.get("skip_load"):
+        logger.info("  skip_load=True — skipping loader")
         return "end"
     return "load"
 

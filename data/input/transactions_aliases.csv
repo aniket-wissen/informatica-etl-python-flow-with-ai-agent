@@ -1,0 +1,4 @@
+txn_no,txn_date,txn_time,txn_value,ccy,cust_acct,merchant,city,country,chan,pay_method,txn_type,txn_status,remarks
+TXN101,2024-03-01,09:15:00,2500.00,INR,ACC001,Zomato,Mumbai,IN,UPI,UPI,DEBIT,SUCCESS,Lunch
+TXN102,2024-03-01,11:30:00,5000.00,USD,ACC002,Amazon,Delhi,IN,APP,CARD,DEBIT,SUCCESS,Electronics
+TXN103,2024-03-02,14:00:00,1200.00,INR,ACC003,DMart,Pune,IN,POS,CARD,DEBIT,SUCCESS,Groceries

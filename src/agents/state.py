@@ -12,6 +12,7 @@ class ETLState(TypedDict):
     entity_type:       Optional[str]   # transactions | accounts
     schema_info:       Optional[dict]  # full schema config
     schema_cached:     bool
+    skip_load:         bool
 
     # Data frames at each stage
     raw_df:            Optional[pd.DataFrame]

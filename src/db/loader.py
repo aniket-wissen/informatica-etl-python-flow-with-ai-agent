@@ -67,14 +67,41 @@ def _parse_date(val) -> dt_date | None:
     except Exception:
         return None
 
-
 def _insert_transactions(df: pd.DataFrame, session):
-    """Insert transactions — skip duplicates."""
+    """Insert transactions — handles both fixed and dynamic new columns."""
     count = 0
+    skipped = 0
+
+    # Fixed columns that map to the Transaction model
+    FIXED_COLUMNS = {
+        "transaction_id", "date", "time", "amount", "currency",
+        "account_id", "merchant_name", "merchant_city", "merchant_country",
+        "channel", "payment_method", "transaction_type", "status", "notes",
+        "account_type", "customer_id", "customer_name", "customer_segment",
+        "risk_rating", "ai_inferred", "ai_confidence"
+    }
+
+    # Detect dynamic new columns not in the fixed model
+    dynamic_columns = [col for col in df.columns if col.lower() not in FIXED_COLUMNS]
+    if dynamic_columns:
+        logger.info(f"  Dynamic columns detected: {dynamic_columns}")
+
     for _, row in df.iterrows():
         try:
+            txn_id = str(row.get("transaction_id", "")).strip()
+            if not txn_id:
+                continue
+
+            exists = session.query(Transaction).filter_by(
+                transaction_id=txn_id
+            ).first()
+            if exists:
+                skipped += 1
+                continue
+
+            # Insert fixed columns via model
             txn = Transaction(
-                transaction_id=str(row.get("transaction_id", "")),
+                transaction_id=txn_id,
                 transaction_date=_parse_date(row.get("date")),
                 transaction_time=_parse_time(row.get("time")),
                 amount=float(row.get("amount")) if pd.notna(row.get("amount", None)) else None,
@@ -97,9 +124,30 @@ def _insert_transactions(df: pd.DataFrame, session):
                 ai_confidence=str(row.get("ai_confidence", "")).strip() or None,
             )
             session.add(txn)
+            session.flush()  # flush so the row exists before UPDATE
+
+            # Now UPDATE dynamic columns directly via raw SQL
+            if dynamic_columns:
+                updates = {}
+                for col in dynamic_columns:
+                    val = row.get(col)
+                    updates[col] = str(val).strip() if pd.notna(val) else None
+
+                set_clause = ", ".join([f'"{col}" = :{col}' for col in updates])
+                params = {"txn_id": txn_id, **updates}
+                session.execute(
+                    text(f'UPDATE transactions SET {set_clause} WHERE transaction_id = :txn_id'),
+                    params
+                )
+
             count += 1
+
         except Exception as e:
+            session.rollback()
             logger.error(f"  Failed to insert transaction {row.get('transaction_id')}: {e}")
+
+    if skipped:
+        logger.info(f"  Skipped {skipped} duplicate transactions")
     return count
 
 
@@ -129,10 +177,10 @@ def loader_agent(state: ETLState) -> ETLState:
 
     session = SessionLocal()
     try:
-        entity_type = state["entity_type"]
+        entity_type  = state["entity_type"]
         loaded_count = 0
+        source_file  = state["csv_path"].split("/")[-1].split("\\")[-1]
 
-        # Load main data
         if entity_type == "transactions":
             enriched_df = state.get("enriched_df")
             if enriched_df is not None and len(enriched_df) > 0:
@@ -145,8 +193,19 @@ def loader_agent(state: ETLState) -> ETLState:
                 loaded_count = _upsert_accounts(clean_df, session)
                 logger.success(f"  Accounts upserted: {loaded_count}")
 
+        else:
+            if state.get("skip_load"):
+                logger.info(f"  '{entity_type}' registered only — skipping load this run")
+            else:
+                logger.info(f"  Unknown entity '{entity_type}' — using generic loader")
+                target_df = state.get("enriched_df")
+                if target_df is None or target_df.empty:
+                    target_df = state.get("clean_df")
+                if target_df is not None and len(target_df) > 0:
+                    loaded_count = _generic_loader(entity_type, target_df, source_file)
+
         # Load failed records
-        failed_df = state.get("failed_df")
+        failed_df    = state.get("failed_df")
         failed_count = 0
         if failed_df is not None and len(failed_df) > 0:
             failed_count = _insert_failed_records(failed_df, session)
@@ -164,3 +223,49 @@ def loader_agent(state: ETLState) -> ETLState:
         session.close()
 
     return state
+
+def _generic_loader(table_name: str, df: pd.DataFrame, source_file: str) -> int:
+    """
+    Load any DataFrame into any table dynamically.
+    Used for new entity types discovered at runtime.
+    """
+    import uuid
+    count = 0
+
+    # Add audit columns
+    df = df.copy()
+    df["source_file"] = source_file
+    df["run_id"]      = str(uuid.uuid4())[:8]
+
+    # Generate _row_id for each row
+    df["_row_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
+    
+    # Sanitize table name — replace hyphens and spaces with underscores
+    table_name = table_name.replace("-", "_").replace(" ", "_").lower()
+    
+    try:
+        df.to_sql(
+            name=table_name,
+            con=engine,
+            if_exists="append",
+            index=False,
+            method="multi"
+        )
+        count = len(df)
+        logger.success(f"  Generic loader — {count} rows loaded into '{table_name}'")
+    except Exception as e:
+        logger.error(f"  Generic loader failed for '{table_name}': {e}")
+        # Fallback — row by row
+        for _, row in df.iterrows():
+            try:
+                pd.DataFrame([row]).to_sql(
+                    name=table_name,
+                    con=engine,
+                    if_exists="append",
+                    index=False
+                )
+                count += 1
+            except Exception as row_err:
+                logger.error(f"  Row failed: {row_err}")
+
+    return count

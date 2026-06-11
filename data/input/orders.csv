@@ -1,0 +1,6 @@
+order_id,order_date,customer_id,product_name,quantity,unit_price,total_amount,order_status,delivery_city,delivery_country
+ORD001,2024-03-01,CUST001,iPhone 15,1,85000.00,85000.00,DELIVERED,Mumbai,IN
+ORD002,2024-03-01,CUST002,MacBook Pro,1,150000.00,150000.00,SHIPPED,Delhi,IN
+ORD003,2024-03-02,CUST003,AirPods Pro,2,25000.00,50000.00,DELIVERED,Pune,IN
+ORD004,2024-03-02,CUST004,iPad Mini,1,45000.00,45000.00,PENDING,Mumbai,IN
+ORD005,2024-03-03,CUST005,Apple Watch,1,35000.00,35000.00,DELIVERED,Bangalore,IN
