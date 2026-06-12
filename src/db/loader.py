@@ -225,24 +225,30 @@ def loader_agent(state: ETLState) -> ETLState:
     return state
 
 def _generic_loader(table_name: str, df: pd.DataFrame, source_file: str) -> int:
-    """
-    Load any DataFrame into any table dynamically.
-    Used for new entity types discovered at runtime.
-    """
     import uuid
+    from sqlalchemy import inspect as sa_inspect
+
+    # Sanitize table name
+    table_name = table_name.replace("-", "_").replace(" ", "_").lower()
+
     count = 0
+    df = df.copy()
 
     # Add audit columns
-    df = df.copy()
     df["source_file"] = source_file
     df["run_id"]      = str(uuid.uuid4())[:8]
+    df["_row_id"]     = [str(uuid.uuid4()) for _ in range(len(df))]
 
-    # Generate _row_id for each row
-    df["_row_id"] = [str(uuid.uuid4()) for _ in range(len(df))]
-    
-    # Sanitize table name — replace hyphens and spaces with underscores
-    table_name = table_name.replace("-", "_").replace(" ", "_").lower()
-    
+    try:
+        inspector     = sa_inspect(engine)
+        existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+        extra_cols    = [c for c in df.columns if c not in existing_cols]
+        if extra_cols:
+            logger.info(f"  Dropping {len(extra_cols)} extra columns not in table: {extra_cols}")
+            df = df.drop(columns=extra_cols)
+    except Exception as e:
+        logger.warning(f"  Could not inspect table columns: {e}")
+
     try:
         df.to_sql(
             name=table_name,
@@ -255,7 +261,6 @@ def _generic_loader(table_name: str, df: pd.DataFrame, source_file: str) -> int:
         logger.success(f"  Generic loader — {count} rows loaded into '{table_name}'")
     except Exception as e:
         logger.error(f"  Generic loader failed for '{table_name}': {e}")
-        # Fallback — row by row
         for _, row in df.iterrows():
             try:
                 pd.DataFrame([row]).to_sql(
